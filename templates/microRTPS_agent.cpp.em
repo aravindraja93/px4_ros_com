@@ -116,13 +116,14 @@ struct options {
 	bool hw_flow_control = false;
 	bool verbose_debug = false;
 	std::string ns = "";
-	std::string rtps_whitelist_ip = "";
+	std::vector<std::string> whitelist = {};
 } _options;
 
 static void usage(const char *name)
 {
 	printf("usage: %s [options]\n\n"
-	       "  -a <whitelist>          List of IP numbers of whitelisted interfaces\n"
+	       "  -a <whitelist>          List of IP numbers of whitelisted interfaces.\n"
+	       "                            Use separate -a flag for each address.\n"
 	       "  -b <baudrate>           UART device baudrate. Defaults to 460800. Used for transmission delay also in UDP case\n"
 	       "  -d <device>             UART device. Defaults to /dev/ttyACM0\n"
 	       "  -f <sw-flow-control>    Activates UART link SW flow control\n"
@@ -166,7 +167,14 @@ static int parse_options(int argc, char **argv)
 
 	while ((ch = getopt_long(argc, argv, "t:d:w:b:o:r:s:i:fghvn:a:", options, nullptr)) >= 0) {
 		switch (ch) {
-		case 'a': if (nullptr != optarg) _options.rtps_whitelist_ip = std::string(optarg); break;
+		case 'a':
+			if (nullptr != optarg) {
+				std::string rtps_whitelist_ip = std::string(optarg);
+				if (rtps_whitelist_ip != "") {
+					_options.whitelist.push_back(rtps_whitelist_ip);
+				}
+			} break;
+
 		case 't': _options.transport      = strcmp(optarg, "UDP") == 0 ?
                                                   options::eTransports::UDP
                                                   : options::eTransports::UART;    break;
@@ -353,14 +361,8 @@ int main(int argc, char **argv)
 	// Init timesync
 	topics->set_timesync(std::make_shared<TimeSync>(_options.verbose_debug));
 
-    std::vector<std::string> whitelist;
-
-    if (_options.rtps_whitelist_ip != "") {
-        whitelist.emplace_back(_options.rtps_whitelist_ip);
-    }
-
 @[if recv_topics]@
-	topics->init(&t_send_queue_cv, &t_send_queue_mutex, &t_send_queue, _options.ns, whitelist, _options.baudrate);
+	topics->init(&t_send_queue_cv, &t_send_queue_mutex, &t_send_queue, _options.ns, _options.whitelist, _options.baudrate);
 @[end if]@
 
 	running = true;
