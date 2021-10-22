@@ -53,14 +53,14 @@ if __name__ == "__main__":
 
     try:
         print(
-            "\n\033[93m" + "-- " + args.topic_name + "_PubSubTopic output test launched:\033[0m")
-        call("ros2 topic echo /" + args.topic_name + "_PubSubTopic", timeout=timeout, stdout=open(
+            "\n\033[93m" + "-- " + args.topic_name + " output test launched:\033[0m")
+        call("ros2 topic echo /" + args.topic_name, timeout=timeout, stdout=open(
             "ros2_topic_echo_out", "w"), shell=True)
     except TimeoutExpired as e:
         output = open("ros2_topic_echo_out", "r").read()
         if output:
             print(
-                "\n\033[42m" + "-- Successfully obtained data on " + args.topic_name + "_PubSubTopic topic. microRTPS bridge is up! Output:\033[0m\n\n")
+                "\n\033[42m" + "-- Successfully obtained data on " + args.topic_name + " topic. microRTPS bridge is up! Output:\033[0m\n\n")
             print("\033[97m" + output + "\033[0m")
             remove("ros2_topic_echo_out")
             exit(0)

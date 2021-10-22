@@ -48,7 +48,7 @@ class VehicleGlobalPositionListener : public rclcpp::Node
 public:
 	explicit VehicleGlobalPositionListener() : Node("vehicle_global_position_listener") {
 		subscription_ = this->create_subscription<px4_msgs::msg::VehicleGlobalPosition>(
-			"VehicleGlobalPosition_PubSubTopic",
+			"fmu/vehicle_global_position/out",
 #ifdef ROS_DEFAULT_API
             10,
 #endif
