@@ -428,7 +428,7 @@ def generate_agent(out_dir):
     # the '-typeros2' option in fastddsgen.
     # .. note:: This is only available in Fastddsgen 1.0.4 and above
     gen_ros2_typename = ""
-    if ros2_distro and ros2_distro in ['dashing', 'eloquent', 'foxy'] and fastddsgen_version >= version.Version("1.0.4"):
+    if ros2_distro and ros2_distro in ['dashing', 'eloquent', 'foxy', 'galactic', 'rolling'] and fastddsgen_version >= version.Version("1.0.4"):
         gen_ros2_typename = "-typeros2 "
 
     for idl_file in glob.glob(os.path.join(idl_dir, "*.idl")):

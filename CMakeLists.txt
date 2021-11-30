@@ -13,11 +13,11 @@ endif()
 # Check if any sanitizers set
 include(EnableSanitizers)
 
-# Check if ROS_DISTRO is Dashing, Eloquent or Foxy
+# Check if ROS_DISTRO is greater or equal to Dashing
 # Required since
 #   - "create_subscription()" and "create_publisher()" APIs changed
 #   - eigen3_cmake_module is only available in these distros
-list(APPEND ROS_DISTROS "dashing" "eloquent" "foxy")
+list(APPEND ROS_DISTROS "dashing" "eloquent" "foxy" "galactic" "rolling")
 set(ROS_DISTRO)
 if(DEFINED ENV{ROS2_DISTRO})
   set(ROS_DISTRO $ENV{ROS2_DISTRO})
@@ -92,11 +92,11 @@ add_executable(micrortps_agent ${MICRORTPS_AGENT_FILES})
 target_link_libraries(micrortps_agent fastrtps fastcdr)
 
 # Add examples
-custom_executable(examples/listeners sensor_combined_listener)
-custom_executable(examples/listeners vehicle_gps_position_listener)
-custom_executable(examples/listeners vehicle_global_position_listener)
-custom_executable(examples/advertisers debug_vect_advertiser)
-custom_executable(examples/offboard offboard_control)
+# custom_executable(examples/listeners sensor_combined_listener)
+# custom_executable(examples/listeners vehicle_gps_position_listener)
+# custom_executable(examples/listeners vehicle_global_position_listener)
+# custom_executable(examples/advertisers debug_vect_advertiser)
+# custom_executable(examples/offboard offboard_control)
 
 ############
 # Install ##

@@ -49,5 +49,5 @@ import launch_ros.actions
 def generate_launch_description():
     return LaunchDescription([
         launch_ros.actions.Node(
-            package='px4_ros_com', node_executable='sensor_combined_listener', output='screen'),
+            package='px4_ros_com', executable='sensor_combined_listener', output='screen'),
     ])
