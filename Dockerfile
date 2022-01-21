@@ -11,6 +11,8 @@ USER root
 ADD . /$PACKAGE_NAME/main_ws/src
 RUN chown -R builder:builder /$PACKAGE_NAME/main_ws
 
+COPY DEFAULT_FASTRTPS_PROFILES.xml /opt/ros/galactic/DEFAULT_FASTRTPS_PROFILES.xml
+
 USER builder
 
 RUN if [ -e /$PACKAGE_NAME/deps_ws ]; then \

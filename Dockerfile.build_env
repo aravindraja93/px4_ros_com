@@ -8,6 +8,7 @@ ARG BUILD_NUMBER
 ARG COMMIT_ID
 ARG GIT_VER
 ARG PACKAGE_NAME
+
 # Install build dependencies
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     curl \
@@ -15,7 +16,15 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     fakeroot \
     dh-make \
     libboost-dev \
+    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
+    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
+    ros-${ROS_DISTRO}-rmw-fastrtps-shared-cpp \
+    ros-${ROS_DISTRO}-rmw-implementation \
+    ros-${ROS_DISTRO}-rosidl-typesupport-fastrtps-cpp \
+    ros-${ROS_DISTRO}-rosidl-typesupport-fastrtps-c \
     && rm -rf /var/lib/apt/lists/*
+
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 RUN groupadd -g $GID builder && \
     useradd -m -u $UID -g $GID -g builder builder && \
