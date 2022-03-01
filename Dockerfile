@@ -26,6 +26,7 @@ RUN sed --in-place \
       /$PACKAGE_NAME/entrypoint.sh && \  
         chmod +x /$PACKAGE_NAME/entrypoint.sh
 
+ENV FASTRTPS_DEFAULT_PROFILES_FILE /$PACKAGE_NAME/main_ws/src/DEFAULT_FASTRTPS_PROFILES.xml
 ENV PACKAGE_NAME $PACKAGE_NAME
 WORKDIR /$PACKAGE_NAME
 ENTRYPOINT "/"$PACKAGE_NAME"/entrypoint.sh"
