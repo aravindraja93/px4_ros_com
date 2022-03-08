@@ -2,7 +2,7 @@ name: main
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, tii_pkcs11_support_fastrtps_v2.5.0 ]
   pull_request:
     branches: [ master ]
 
@@ -20,7 +20,7 @@ jobs:
           path: px4_ros_com
 
       # Run docker build
-      - name: Run fog-sw docker build
+      - name: Run fog-sw-sros docker build
         env:
           ROS: 1
           ROS_DISTRO: ${{ matrix.ros2_distro }}
@@ -39,8 +39,8 @@ jobs:
       - name: Upload to Artifactory
         env:
           ARTIFACTORY_REPO: debian-public-local
-          DISTRIBUTION: focal
-          COMPONENT: fog-sw
+          DISTRIBUTION: galactic
+          COMPONENT: fog-sw-sros
           ARCHITECTURE: amd64
           BUILD_NAME: px4-ros-com
           CI: true

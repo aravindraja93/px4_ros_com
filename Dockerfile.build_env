@@ -15,7 +15,6 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     fakeroot \
     dh-make \
     libboost-dev \
-    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g $GID builder && \
@@ -29,6 +28,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-genmsg \
     openjdk-11-jdk-headless \
     fast-dds-gen \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /$PACKAGE_NAME/packaging
@@ -38,6 +38,9 @@ COPY underlay.repos package.xml /$PACKAGE_NAME/packaging/
 COPY entrypoint.sh* /$PACKAGE_NAME/
 
 RUN /$PACKAGE_NAME/packaging/rosdep.sh /$PACKAGE_NAME
+
+RUN wget https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote/ros-galactic-fastrtps_2.5.0-7~git20220310.4ca1f95_amd64.deb \
+    && dpkg -i ros-galactic-fastrtps*.deb
 
 RUN chown -R builder:builder /$PACKAGE_NAME
 
