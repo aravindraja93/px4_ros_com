@@ -122,7 +122,8 @@ void RtpsTopics::publish(const uint8_t topic_ID, char data_buffer[], size_t len)
 	switch (topic_ID) {
 @[for topic in send_topics]@
 
-	case @(msgs[0].index(topic) + 1): { // @(topic) publisher
+	case @(msgs[0].index(topic) + 1): // @(topic) publisher
+	{
 		@(topic)_msg_t st;
 		eprosima::fastcdr::FastBuffer cdrbuffer(data_buffer, len);
 		eprosima::fastcdr::Cdr cdr_des(cdrbuffer);
@@ -145,8 +146,10 @@ void RtpsTopics::publish(const uint8_t topic_ID, char data_buffer[], size_t len)
 		break;
 	}
 }
+
 @[end if]@
 @[if recv_topics]@
+
 template <typename T>
 void RtpsTopics::sync_timestamp_of_outgoing_data(T &msg, size_t len) {
 	uint64_t timestamp_sample = getMsgTimestampSample(&msg);
@@ -168,7 +171,8 @@ bool RtpsTopics::getMsg(const uint8_t topic_ID, eprosima::fastcdr::Cdr &scdr)
 @[for topic in recv_topics]@
 
 	case @(msgs[0].index(topic) + 1): // @(topic) subscriber
-		if (_@(topic)_sub.hasMsg()) {
+		if (_@(topic)_sub.hasMsg())
+		{
 			@(topic)_msg_t msg = _@(topic)_sub.getMsg();
 
 			// apply timestamp offset

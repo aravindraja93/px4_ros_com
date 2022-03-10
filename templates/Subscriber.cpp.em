@@ -74,27 +74,39 @@ if ros2_distro:
 
 #include "@(topic)_Subscriber.h"
 
-#include <fastrtps/Domain.h>
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/subscriber/Subscriber.h>
-#include <fastrtps/attributes/SubscriberAttributes.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-@[if version.parse(fastrtps_version) >= version.parse('2.0')]@
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/dds/subscriber/Subscriber.hpp>
+#include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
+#include <fastdds/dds/subscriber/SampleInfo.hpp>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 
-using SharedMemTransportDescriptor = eprosima::fastdds::rtps::SharedMemTransportDescriptor;
-@[end if]@
-
+using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
 
 @(topic)_Subscriber::@(topic)_Subscriber()
 	: mp_participant(nullptr),
-	  mp_subscriber(nullptr)
+		mp_subscriber(nullptr),
+		mp_reader(nullptr),
+		mp_topic(nullptr),
+		mp_type(new @(topic)_msg_datatype())
 { }
 
 @(topic)_Subscriber::~@(topic)_Subscriber()
 {
-	Domain::removeParticipant(mp_participant);
+	if (mp_reader != nullptr)
+	{
+		mp_subscriber->delete_datareader(mp_reader);
+	}
+	if (mp_topic != nullptr)
+	{
+		mp_participant->delete_topic(mp_topic);
+	}
+	if (mp_subscriber != nullptr)
+	{
+		mp_participant->delete_subscriber(mp_subscriber);
+	}
+	DomainParticipantFactory::get_instance()->delete_participant(mp_participant);
+
 }
 
 bool @(topic)_Subscriber::init(uint8_t topic_ID, std::condition_variable *t_send_queue_cv,
@@ -106,171 +118,113 @@ bool @(topic)_Subscriber::init(uint8_t topic_ID, std::condition_variable *t_send
 	m_listener.t_send_queue_mutex = t_send_queue_mutex;
 	m_listener.t_send_queue = t_send_queue;
 
-	// Create RTPSParticipant
-	ParticipantAttributes PParam;
-	Domain::getDefaultParticipantAttributes(PParam);
-@[if version.parse(fastrtps_version) < version.parse('2.0')]@
-	PParam.rtps.builtin.domainId = 0;
-@[else]@
-	PParam.domainId = 0;
-@[end if]@
-@[if version.parse(fastrtps_version) <= version.parse('1.8.4')]@
-	PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
-@[else]@
-	PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
-@[end if]@
-@[if ros2_distro]@
-	// ROS2 default memory management policy
-	PParam.rtps.builtin.writerHistoryMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-@[end if]@
+	// Create Participant
 	std::string nodeName = ns;
 	nodeName.append("@(topic)_subscriber");
-	PParam.rtps.setName(nodeName.c_str());
+	DomainParticipantQos participantQos;
+	participantQos.name(nodeName.c_str());
 
-@[if ros2_distro]@
-	// Check if ROS_LOCALHOST_ONLY is set. This means that one wants to use only
-	// the localhost network for data sharing. If FastRTPS/DDS >= 2.0 and
-	// RMW_IMPLEMENTATION is FastDDS then the Shared Memory transport is used
-	const char* localhost_only = std::getenv("ROS_LOCALHOST_ONLY");
-	const char* rmw_implementation = std::getenv("RMW_IMPLEMENTATION");
-	const char* ros_distro = std::getenv("ROS_DISTRO");
-	if (localhost_only && strcmp(localhost_only, "1") == 0
-	    && ((rmw_implementation && ((strcmp(rmw_implementation, "rmw_fastrtps_cpp") == 0)
-	    || (strcmp(rmw_implementation, "rmw_fastrtps_dynamic_cpp") == 0)))
-	    || (!rmw_implementation && ros_distro && strcmp(ros_distro, "foxy") == 0))) {
-		// Create a custom network UDPv4 transport descriptor
-		// to whitelist the localhost
-		auto localhostUdpTransport = std::make_shared<UDPv4TransportDescriptor>();
-		localhostUdpTransport->interfaceWhiteList.emplace_back("127.0.0.1");
-
-		// Disable the built-in Transport Layer
-		PParam.rtps.useBuiltinTransports = false;
-
-		// Add the descriptor as a custom user transport
-		PParam.rtps.userTransports.push_back(localhostUdpTransport);
-
-@[    if version.parse(fastrtps_version) >= version.parse('2.0')]@
-		// Add shared memory transport when available
-		auto shmTransport = std::make_shared<SharedMemTransportDescriptor>();
-		PParam.rtps.userTransports.push_back(shmTransport);
-@[    end if]@
-	}
-@[end if]@
 	if (!whitelist.empty()) {
-		//Create a descriptor for the new transport.
+		// Create a descriptor for the new transport.
 		auto custom_transport = std::make_shared<UDPv4TransportDescriptor>();
-
 		custom_transport->interfaceWhiteList = whitelist;
 
-		//Disable the built-in Transport Layer.
-		PParam.rtps.useBuiltinTransports = false;
+		// Link the Transport Layer to the Participant.
+		participantQos.transport().user_transports.push_back(custom_transport);
 
-		//Link the Transport Layer to the Participant.
-		PParam.rtps.userTransports.push_back(custom_transport);
+		// Disable the built-in Transport Layer.
+		participantQos.transport().use_builtin_transports = false;
 	}
 
-	mp_participant = Domain::createParticipant(PParam);
-
-	if (mp_participant == nullptr) {
+	mp_participant = DomainParticipantFactory::get_instance()->create_participant(0, participantQos);
+	if(mp_participant == nullptr)
+	{
 		return false;
 	}
 
 	// Register the type
-	Domain::registerType(mp_participant, static_cast<TopicDataType *>(&@(topic)DataType));
+	mp_type.register_type(mp_participant);
 
-	// Create Subscriber
-	SubscriberAttributes Rparam;
-	Domain::getDefaultSubscriberAttributes(Rparam);
-	Rparam.topic.topicKind = NO_KEY;
-	Rparam.topic.topicDataType = @(topic)DataType.getName();
-@[if ros2_distro]@
-@[    if ros2_distro == "ardent"]@
-	Rparam.qos.m_partition.push_back("rt");
-	std::string topicName = ns;
-@[    else]@
+	// Create subscription topic
+
 	std::string topicName = "rt/";
 	topicName.append(ns);
-@[    end if]@
-@[else]@
-	std::string topicName = ns;
-@[end if]@
 	topic_name.empty() ? topicName.append("fmu/@(topic_name)/in") : topicName.append(topic_name);
-	Rparam.topic.topicName = topicName;
-	mp_subscriber = Domain::createSubscriber(mp_participant, Rparam, static_cast<SubscriberListener *>(&m_listener));
+	mp_topic = mp_participant->create_topic(topicName.c_str(), mp_type.get_type_name(), TOPIC_QOS_DEFAULT);
+	if (mp_topic == nullptr)
+	{
+		return false;
+	}
 
-	if (mp_subscriber == nullptr) {
+	// Create Subscriber
+	mp_subscriber = mp_participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT, nullptr);
+	if (mp_subscriber == nullptr)
+	{
+		return false;
+	}
+
+	// Create the DataReader
+	mp_reader = mp_subscriber->create_datareader(mp_topic, DATAREADER_QOS_DEFAULT, &m_listener);
+	if (mp_reader == nullptr)
+	{
 		return false;
 	}
 
 	return true;
 }
 
-void @(topic)_Subscriber::SubListener::onSubscriptionMatched(Subscriber *sub, MatchingInfo &info)
+void @(topic)_Subscriber::SubListener::on_subscription_matched(DataReader*,
+                const SubscriptionMatchedStatus& info)
 {
 @# Since the time sync runs on the bridge itself, it is required that there is a
 @# match between two topics of the same entity
 @[if topic != 'Timesync' and topic != 'timesync' and topic != 'TimesyncStatus' and topic != 'timesync_status']@
-	// The first 6 values of the ID guidPrefix of an entity in a DDS-RTPS Domain
-	// are the same for all its subcomponents (publishers, subscribers)
-	bool is_different_endpoint = false;
-
-	for (size_t i = 0; i < 6; i++) {
-		if (sub->getGuid().guidPrefix.value[i] != info.remoteEndpointGuid.guidPrefix.value[i]) {
-			is_different_endpoint = true;
-			break;
-		}
-	}
-
-	// If the matching happens for the same entity, do not make a match
-	if (is_different_endpoint) {
-		if (info.status == MATCHED_MATCHING) {
-			n_matched++;
-			std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) subscriber matched\033[0m" << std::endl;
-
-		} else {
-			n_matched--;
-			std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) subscriber unmatched\033[0m" << std::endl;
-		}
-	}
+    if (info.current_count_change == 1)
+    {
+        n_matched = info.total_count;
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) subscriber matched\033[0m" << std::endl;
+    }
+    else if (info.current_count_change == -1)
+    {
+        n_matched = info.total_count;
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) subscriber unmatched\033[0m" << std::endl;
+    }
+    else
+    {
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t @(topic) subscriber: " << info.current_count_change
+                << " is not a valid value for SubscriptionMatchedStatus current count change.\033[0m" << std::endl;
+    }
 
 @[else]@
-	(void)sub;
+    n_matched = info.total_count;
 
-	if (info.status == MATCHED_MATCHING) {
-		n_matched++;
-
-	} else {
-		n_matched--;
-	}
 @[end if]@
 }
 
-void @(topic)_Subscriber::SubListener::onNewDataMessage(Subscriber *sub)
+void @(topic)_Subscriber::SubListener::on_data_available(
+                DataReader* reader)
 {
-	if (n_matched > 0) {
-		std::unique_lock<std::mutex> has_msg_lock(has_msg_mutex);
+    std::unique_lock<std::mutex> has_msg_lock(has_msg_mutex);
+    if(has_msg.load() == true) // Check if msg has been fetched
+    {
+        has_msg_cv.wait(has_msg_lock); // Wait till msg has been fetched
+    }
+    has_msg_lock.unlock();
 
-		if (has_msg.load() == true) { // Check if msg has been fetched
-			has_msg_cv.wait(has_msg_lock); // Wait till msg has been fetched
-		}
+    if (reader->take_next_sample(&msg, &m_info) == ReturnCode_t::RETCODE_OK)
+    {
+        if (m_info.valid_data)
+        {
+                std::unique_lock<std::mutex> lk(*t_send_queue_mutex);
 
-		has_msg_lock.unlock();
+                ++n_msg;
+                has_msg = true;
 
-		// Take data
-		if (sub->takeNextData(&msg, &m_info)) {
-			if (m_info.sampleKind == ALIVE) {
-				std::unique_lock<std::mutex> lk(*t_send_queue_mutex);
-
-				++n_msg;
-				has_msg = true;
-
-				t_send_queue->push(topic_ID);
-				lk.unlock();
-				t_send_queue_cv->notify_one();
-
-			}
-		}
-	}
+                t_send_queue->push(topic_ID);
+                lk.unlock();
+                t_send_queue_cv->notify_one();
+        }
+    }
 }
 
 bool @(topic)_Subscriber::hasMsg()

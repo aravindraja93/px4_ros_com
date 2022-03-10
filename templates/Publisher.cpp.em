@@ -75,160 +75,113 @@ if ros2_distro:
 
 #include "@(topic)_Publisher.h"
 
-#include <fastrtps/Domain.h>
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/publisher/Publisher.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-@[if version.parse(fastrtps_version) >= version.parse('2.0')]@
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/dds/publisher/Publisher.hpp>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 
-using SharedMemTransportDescriptor = eprosima::fastdds::rtps::SharedMemTransportDescriptor;
-@[end if]@
-
+using eprosima::fastdds::rtps::UDPv4TransportDescriptor;
 
 @(topic)_Publisher::@(topic)_Publisher()
-	: mp_participant(nullptr),
-	  mp_publisher(nullptr)
+    : mp_participant(nullptr),
+      mp_publisher(nullptr),
+      mp_topic(nullptr),
+      mp_writer(nullptr),
+      mp_type(new @(topic)_msg_datatype())
 { }
 
 @(topic)_Publisher::~@(topic)_Publisher()
 {
-	Domain::removeParticipant(mp_participant);
+    if (mp_writer != nullptr)
+    {
+        mp_publisher->delete_datawriter(mp_writer);
+    }
+    if (mp_publisher != nullptr)
+    {
+        mp_participant->delete_publisher(mp_publisher);
+    }
+    if (mp_topic != nullptr)
+    {
+        mp_participant->delete_topic(mp_topic);
+    }
+    DomainParticipantFactory::get_instance()->delete_participant(mp_participant);
 }
 
 bool @(topic)_Publisher::init(const std::string &ns, const std::vector<std::string>& whitelist, std::string topic_name)
 {
-	// Create RTPSParticipant
-	ParticipantAttributes PParam;
-	Domain::getDefaultParticipantAttributes(PParam);
-@[if version.parse(fastrtps_version) < version.parse('2.0')]@
-	PParam.rtps.builtin.domainId = 0;
-@[else]@
-	PParam.domainId = 0;
-@[end if]@
-@[if version.parse(fastrtps_version) <= version.parse('1.8.4')]@
-	PParam.rtps.builtin.leaseDuration = c_TimeInfinite;
-@[else]@
-	PParam.rtps.builtin.discovery_config.leaseDuration = c_TimeInfinite;
-@[end if]@
-@[if ros2_distro]@
-	// ROS2 default memory management policy
-	PParam.rtps.builtin.writerHistoryMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-@[end if]@
-	std::string nodeName = ns;
-	nodeName.append("@(topic)_publisher");
-	PParam.rtps.setName(nodeName.c_str());
+    // Create DomainParticipant
+    DomainParticipantQos participantQos;
+    std::string nodeName = ns;
+    nodeName.append("@(topic)_publisher");
+    participantQos.name(nodeName.c_str());
 
-	if (!whitelist.empty()) {
-		//Create a descriptor for the new transport.
-		auto custom_transport = std::make_shared<UDPv4TransportDescriptor>();
+    if (!whitelist.empty()) {
+      //Create a descriptor for the new transport.
+      auto custom_transport = std::make_shared<UDPv4TransportDescriptor>();
+      custom_transport->interfaceWhiteList = whitelist;
 
-		custom_transport->interfaceWhiteList = whitelist;
+      // Link the Transport Layer to the Participant.
+      participantQos.transport().user_transports.push_back(custom_transport);
 
-		//Disable the built-in Transport Layer.
-		PParam.rtps.useBuiltinTransports = false;
+      //Disable the built-in Transport Layer.
+      participantQos.transport().use_builtin_transports = false;
+    }
 
-		//Link the Transport Layer to the Participant.
-		PParam.rtps.userTransports.push_back(custom_transport);
-	}
+    mp_participant = DomainParticipantFactory::get_instance()->create_participant(0, participantQos);
+    if(mp_participant == nullptr)
+        return false;
 
-@[if ros2_distro]@
-	// Check if ROS_LOCALHOST_ONLY is set. This means that one wants to use only
-	// the localhost network for data sharing. If FastRTPS/DDS >= 2.0 and
-	// RMW_IMPLEMENTATION is FastDDS then the Shared Memory transport is used
-	const char* localhost_only = std::getenv("ROS_LOCALHOST_ONLY");
-	const char* rmw_implementation = std::getenv("RMW_IMPLEMENTATION");
-	const char* ros_distro = std::getenv("ROS_DISTRO");
-	if (localhost_only && strcmp(localhost_only, "1") == 0
-	    && ((rmw_implementation && ((strcmp(rmw_implementation, "rmw_fastrtps_cpp") == 0)
-	    || (strcmp(rmw_implementation, "rmw_fastrtps_dynamic_cpp") == 0)))
-	    || (!rmw_implementation && ros_distro && strcmp(ros_distro, "foxy") == 0))) {
-		// Create a custom network UDPv4 transport descriptor
-		// to whitelist the localhost
-		auto localhostUdpTransport = std::make_shared<UDPv4TransportDescriptor>();
-		localhostUdpTransport->interfaceWhiteList.emplace_back("127.0.0.1");
+    // Register the type
+    mp_type.register_type(mp_participant);
 
-		// Disable the built-in Transport Layer
-		PParam.rtps.useBuiltinTransports = false;
+    // Create the publications Topic
+    std::string topicName = "rt/"; // Indicate ROS2 that this is user topic
+    topicName.append(ns);
+    topic_name.empty() ? topicName.append("fmu/@(topic_name)/out") : topicName.append(topic_name);
+    mp_topic = mp_participant->create_topic(topicName.c_str(), mp_type.get_type_name(), TOPIC_QOS_DEFAULT);
+    if(mp_topic == nullptr)
+        return false;
 
-		// Add the descriptor as a custom user transport
-		PParam.rtps.userTransports.push_back(localhostUdpTransport);
+    // Create the Publisher
+    mp_publisher = mp_participant->create_publisher(PUBLISHER_QOS_DEFAULT, nullptr);
+    if(mp_publisher == nullptr)
+        return false;
 
-@[    if version.parse(fastrtps_version) >= version.parse('2.0')]@
-		// Add shared memory transport when available
-		auto shmTransport = std::make_shared<SharedMemTransportDescriptor>();
-		PParam.rtps.userTransports.push_back(shmTransport);
-@[    end if]@
-	}
-@[end if]@
+    // Create the DataWriter
+    mp_writer = mp_publisher->create_datawriter(mp_topic, DATAWRITER_QOS_DEFAULT, &m_listener);
 
-	mp_participant = Domain::createParticipant(PParam);
-
-	if (mp_participant == nullptr) {
-		return false;
-	}
-
-	// Register the type
-	Domain::registerType(mp_participant, static_cast<TopicDataType *>(&@(topic)DataType));
-
-	// Create Publisher
-	PublisherAttributes Wparam;
-	Domain::getDefaultPublisherAttributes(Wparam);
-	Wparam.topic.topicKind = NO_KEY;
-	Wparam.topic.topicDataType = @(topic)DataType.getName();
-@[if ros2_distro]@
-@[    if ros2_distro == "ardent"]@
-	Wparam.qos.m_partition.push_back("rt");
-	std::string topicName = ns;
-@[    else]@
-	std::string topicName = "rt/";
-	topicName.append(ns);
-@[    end if]@
-	// ROS2 default publish mode QoS policy
-	Wparam.qos.m_publishMode.kind = eprosima::fastdds::dds::ASYNCHRONOUS_PUBLISH_MODE;
-@[else]@
-	std::string topicName = ns;
-@[end if]@
-	topic_name.empty() ? topicName.append("fmu/@(topic_name)/out") : topicName.append(topic_name);
-	Wparam.topic.topicName = topicName;
-	mp_publisher = Domain::createPublisher(mp_participant, Wparam, static_cast<PublisherListener *>(&m_listener));
-
-	if (mp_publisher == nullptr) {
-		return false;
-	}
-
-	return true;
+    if (mp_writer == nullptr)
+    {
+        return false;
+    }
+    return true;
 }
 
-void @(topic)_Publisher::PubListener::onPublicationMatched(Publisher *pub, MatchingInfo &info)
+void @(topic)_Publisher::PubListener::on_publication_matched(DataWriter*,
+                const PublicationMatchedStatus& info)
 {
-	// The first 6 values of the ID guidPrefix of an entity in a DDS-RTPS Domain
-	// are the same for all its subcomponents (publishers, subscribers)
-	bool is_different_endpoint = false;
 
-	for (size_t i = 0; i < 6; i++) {
-		if (pub->getGuid().guidPrefix.value[i] != info.remoteEndpointGuid.guidPrefix.value[i]) {
-			is_different_endpoint = true;
-			break;
-		}
-	}
-
-	// If the matching happens for the same entity, do not make a match
-	if (is_different_endpoint) {
-		if (info.status == MATCHED_MATCHING) {
-			n_matched++;
-			std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) publisher matched\033[0m" << std::endl;
-
-		} else {
-			n_matched--;
-			std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) publisher unmatched\033[0m" << std::endl;
-		}
-	}
+    if (info.current_count_change == 1)
+    {
+        n_matched = info.total_count;
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) publisher matched\033[0m" << std::endl;
+    }
+    else if (info.current_count_change == -1)
+    {
+        n_matched = info.total_count;
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t@(topic) publisher unmatched\033[0m" << std::endl;
+    }
+    else
+    {
+        std::cout << "\033[0;37m[   micrortps_agent   ]\t @(topic) publisher: " << info.current_count_change
+                << " is not a valid value for PublicationMatchedStatus current count change.\033[0m" << std::endl;
+    }
 }
 
-void @(topic)_Publisher::publish(@(topic)_msg_t *st)
+void @(topic)_Publisher::publish(@(topic)_msg_t* st)
 {
-	mp_publisher->write(st);
+    if (m_listener.n_matched > 0)
+    {
+        mp_writer->write(st);
+    }
 }

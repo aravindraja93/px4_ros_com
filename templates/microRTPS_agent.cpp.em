@@ -11,6 +11,8 @@
 @###############################################
 @{
 import genmsg.msgs
+
+from px_generate_uorb_topic_helper import * # this is in Tools/
 from px_generate_uorb_topic_files import MsgScope # this is in Tools/
 
 try:
@@ -69,7 +71,6 @@ recv_topics = [(alias[idx] if alias[idx] else s.short_name) for idx, s in enumer
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastCdr.h>
 #include <fastcdr/exceptions/Exception.h>
-#include <fastrtps/Domain.h>
 
 #include "microRTPS_transport.h"
 #include "microRTPS_timesync.h"
@@ -92,7 +93,6 @@ recv_topics = [(alias[idx] if alias[idx] else s.short_name) for idx, s in enumer
 #define DEFAULT_IP        "127.0.0.1"
 
 using namespace eprosima;
-using namespace eprosima::fastrtps;
 
 volatile sig_atomic_t running = 1;
 std::unique_ptr<Transport_node> transport_node;
