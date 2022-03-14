@@ -64,9 +64,10 @@ except AttributeError:
 #ifndef _@(topic)__SUBSCRIBER_H_
 #define _@(topic)__SUBSCRIBER_H_
 
-#include <fastrtps/fastrtps_fwd.h>
-#include <fastrtps/subscriber/SubscriberListener.h>
-#include <fastrtps/subscriber/SampleInfo.h>
+#include <fastdds/dds/domain/DomainParticipant.hpp>
+#include <fastdds/dds/subscriber/SampleInfo.hpp>
+#include <fastdds/dds/subscriber/DataReader.hpp>
+#include <fastdds/dds/subscriber/DataReaderListener.hpp>
 @[if version.parse(fastrtps_version) <= version.parse('1.7.2')]@
 #include "@(topic)_PubSubTypes.h"
 @[else]@
@@ -77,8 +78,6 @@ except AttributeError:
 #include <condition_variable>
 #include <queue>
 
-using namespace eprosima::fastrtps;
-using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastdds::dds;
 
 @[if version.parse(fastrtps_version) <= version.parse('1.7.2')]@
@@ -112,17 +111,21 @@ public:
 	void unlockMsg();
 
 private:
-	Participant *mp_participant;
-	Subscriber *mp_subscriber;
+	DomainParticipant* mp_participant;
+	Subscriber* mp_subscriber;
+	DataReader* mp_reader;
+	Topic* mp_topic;
+	TypeSupport mp_type;
 
-	class SubListener : public SubscriberListener
+	class SubListener : public DataReaderListener
 	{
 	public:
 		SubListener() : n_matched(0), n_msg(0), has_msg(false) {};
 		~SubListener() {};
-		void onSubscriptionMatched(Subscriber *sub, MatchingInfo &info);
-		void onNewDataMessage(Subscriber *sub);
-		SampleInfo_t m_info;
+		void on_subscription_matched(DataReader*,
+			const SubscriptionMatchedStatus& info);
+		void on_data_available(DataReader* reader);
+		SampleInfo m_info;
 		int n_matched;
 		int n_msg;
 		@(topic)_msg_t msg;
