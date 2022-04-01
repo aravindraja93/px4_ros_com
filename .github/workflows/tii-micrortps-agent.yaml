@@ -2,7 +2,7 @@ name: tii-micrortps-agent
 
 on:
   push:
-    branches: master
+    branches: [ master, test-container ]
     tags:
       - 'v*'
       - v[0-9]+.[0-9]+.[0-9]+
