@@ -1,6 +1,12 @@
 #!/bin/bash -e
 
+# TODO: is this only used for setting $DRONE_DEVICE_ID ?
 source /opt/ros/galactic/setup.bash
+
+if [[ ! "${DRONE_DEVICE_ID:-}" ]]; then
+	echo "[ERROR] DRONE_DEVICE_ID not set"
+	exit 1
+fi
 
 if [ "${FLIGHT_CONTROLLER_DIRECT_ETH}" != "" ]; then
   # Direct ethernet connection to FC
