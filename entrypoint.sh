@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # TODO: is this only used for setting $DRONE_DEVICE_ID ?
-source /opt/ros/galactic/setup.bash
+include /opt/ros/${ROS_DISTRO}/setup.bash
 
 if [[ ! "${DRONE_DEVICE_ID:-}" ]]; then
 	echo "[ERROR] DRONE_DEVICE_ID not set"
