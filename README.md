@@ -6,6 +6,17 @@ This package materializes the ROS2 side of PX4-FastRTPS/DDS bridge, establishing
 
 The [`master`](https://github.com/PX4/px4_ros_com/tree/master) branch of this package composes the ROS2 package and the ROS2 side (agent) of the bridge. The [`ros1`](https://github.com/PX4/px4_ros_com/tree/ros1) branch is a product of the `master` and represents the ROS(1) package and the ROS(1) side of the bridge, for wich it is required using the [`ros1_bridge`](https://github.com/ros2/ros1_bridge).
 
+
+## Development, debug
+
+[See documentation in container base image](https://github.com/tiiuae/fog-ros-baseimage/tree/main#development--debug-for-concrete-projects)
+
+
+## Outdated documentation
+
+**WARNING**: Rest of the docs are outdated regarding container-specific build/running.
+
+
 ## Install, build and usage
 
 Check the [RTPS/ROS2 Interface](https://dev.px4.io/en/middleware/micrortps.html) section on the PX4 Devguide for details on how to install the required dependencies, build the package (composed by the two branches) and use it.
