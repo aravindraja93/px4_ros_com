@@ -1,32 +1,30 @@
-# fog-sw BUILDER
-ARG FROM_IMAGE
-FROM $FROM_IMAGE as fog-sw-builder
-ARG ROS_DISTRO="galactic"
-ARG UID=1000
-ARG GID=1000
-ARG PACKAGE_NAME
+FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-latest AS builder
 
-WORKDIR /$PACKAGE_NAME/main_ws
-USER root
-ADD . /$PACKAGE_NAME/main_ws/src
-RUN chown -R builder:builder /$PACKAGE_NAME/main_ws
+# TODO: should these be in the base image?
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    python3-genmsg \
+    openjdk-11-jdk-headless \
+    fast-dds-gen \
+    && rm -rf /var/lib/apt/lists/*
 
-USER builder
+COPY . /main_ws/src/
 
-RUN if [ -e /$PACKAGE_NAME/deps_ws ]; then \
-        . /$PACKAGE_NAME/deps_ws/install/setup.sh && \
-        colcon build; \
-    elif [ -e /opt/ros/${ROS_DISTRO}/setup.sh ]; then \
-        . /opt/ros/${ROS_DISTRO}/setup.sh && \
-        colcon build; \
-    fi 
+# this:
+# 1) builds the application
+# 2) packages the application as .deb, writes it to /main_ws/
+RUN /packaging/build.sh
 
-RUN sed --in-place \
-      's|^source .*|source "/'$PACKAGE_NAME'/main_ws/install/setup.bash"|' \
-      /$PACKAGE_NAME/entrypoint.sh && \  
-        chmod +x /$PACKAGE_NAME/entrypoint.sh
+#  ▲               runtime ──┐
+#  └── build                 ▼
 
-ENV FASTRTPS_DEFAULT_PROFILES_FILE /$PACKAGE_NAME/main_ws/src/DEFAULT_FASTRTPS_PROFILES.xml
-ENV PACKAGE_NAME $PACKAGE_NAME
-WORKDIR /$PACKAGE_NAME
-ENTRYPOINT "/"$PACKAGE_NAME"/entrypoint.sh"
+FROM ghcr.io/tiiuae/fog-ros-baseimage:stable
+
+ENTRYPOINT /entrypoint.sh
+
+COPY entrypoint.sh /entrypoint.sh
+
+COPY --from=builder /main_ws/ros-*-px4-ros-com_*_amd64.deb /px4-ros-com.deb
+
+# need update because ROS people have a habit of removing old packages pretty fast
+RUN apt update && apt install -y libeigen3-dev ros-${ROS_DISTRO}-eigen3-cmake-module \
+	&& dpkg -i /px4-ros-com.deb && rm /px4-ros-com.deb
