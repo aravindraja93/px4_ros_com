@@ -1,0 +1,18 @@
+FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-latest AS builder
+
+# TODO: should these be in the base image?
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    python3-genmsg \
+    openjdk-11-jdk-headless \
+    fast-dds-gen \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /main_ws/src/
+
+# this:
+# 1) builds the application
+# 2) packages the application as .deb, writes it to /main_ws/
+RUN /packaging/build.sh
+RUN mkdir -p /deb_file \
+    && cp -f /main_ws/ros-*-px4-ros-com_*_amd64.deb /deb_file
+
