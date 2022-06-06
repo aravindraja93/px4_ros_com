@@ -359,13 +359,10 @@ int main(int argc, char **argv)
 	// Init timesync
 	topics->set_timesync(std::make_shared<TimeSync>(_options.verbose_debug));
 
-@[if recv_topics]@
-	topics->init(&t_send_queue_cv, &t_send_queue_mutex, &t_send_queue, _options.ns, _options.whitelist, _options.baudrate);
-@[end if]@
-
 	running = true;
 @[if recv_topics]@
 	std::thread sender_thread(t_send, nullptr);
+	topics->init(&t_send_queue_cv, &t_send_queue_mutex, &t_send_queue, _options.ns, _options.whitelist, _options.baudrate);
 @[end if]@
 
 	while (running) {
