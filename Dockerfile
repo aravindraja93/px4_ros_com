@@ -5,8 +5,10 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-genmsg \
     openjdk-11-jdk-headless \
     fast-dds-gen \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
+# TEMPORARY: TO BE REMOVED WHEN BASEIMAGE IS UPDATED WITH PX4-MSGS_4.0.0
 RUN wget https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote-cache/ros-galactic-px4-msgs_4.0.0-25~git20220422.0f07b25_amd64.deb -O /px4-msgs.deb \
   && dpkg -i /px4-msgs.deb
 
@@ -26,7 +28,8 @@ ENTRYPOINT /entrypoint.sh
 
 COPY entrypoint.sh /entrypoint.sh
 
-COPY --from=build /px4-msgs.deb .
+# TEMPORARY: TO BE REMOVED WHEN BASEIMAGE IS UPDATED WITH PX4-MSGS_4.0.0
+COPY --from=builder /px4-msgs.deb .
 RUN dpkg -i px4-msgs.deb && rm px4-msgs.deb
 
 COPY --from=builder /main_ws/ros-*-px4-ros-com_*_amd64.deb /px4-ros-com.deb
