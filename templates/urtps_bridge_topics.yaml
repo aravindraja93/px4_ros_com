@@ -83,3 +83,35 @@ rtps:
     send: true
   - msg: HomePosition
     send: true
+  - msg: YawEstimatorStatus
+    send: true
+  - msg: ActuatorControls
+    send: true
+  - msg: ActuatorOutputs
+    send: true
+  - msg: Airspeed
+    send: true
+  - msg: AirspeedWind
+    send: true
+  - msg: HoverThrustEstimate
+    send: true
+  - msg: VehicleAttitude
+    send: true
+  - msg: VehicleConstraints
+    send: true
+  - msg: VehicleImu
+    send: true
+  - msg: VehicleAirData
+    send: true
+  - msg: VehicleThrustSetpoint
+    send: true
+  - msg: Wind
+    send: true
+  - msg: VehicleTorqueSetpoint
+    send: true
+  - msg: VehicleOdometry
+    send: true
+  - msg: VehicleRatesSetpoint
+    send: true
+  - msg: VehicleMagnetometer
+    send: true
