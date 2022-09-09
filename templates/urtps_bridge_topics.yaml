@@ -83,3 +83,5 @@ rtps:
     send: true
   - msg: HomePosition
     send: true
+  - msg: GpsInjectData
+    receive: true
